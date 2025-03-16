@@ -8,9 +8,10 @@ from langchain_groq import ChatGroq
 from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
+import streamlit as st
 
 # Load environment variables
-load_dotenv()
+load_dotenv()  # Works locally but won't work in Streamlit Cloud
 
 # Constants
 CHUNK_SIZE = 512
@@ -24,6 +25,9 @@ PERSISTENT_STORAGE = os.getenv("STREAMLIT_CLOUD") != "true"  # Disable persisten
 # Disable Hugging Face tokenizer parallelism warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+# Load API Key from Streamlit Secrets (for Streamlit Cloud)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets["GROQ_API_KEY"]
+
 # Initialize components
 llm = None
 chroma_client = None
@@ -36,7 +40,7 @@ def initialize_components():
     global llm, chroma_client, collection
 
     if llm is None:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500)
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500, api_key=GROQ_API_KEY)
 
     if chroma_client is None:
         if PERSISTENT_STORAGE:
