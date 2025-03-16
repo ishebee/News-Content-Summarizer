@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 import chromadb
-import tempfile  # ✅ Fix for Streamlit Cloud
 from uuid import uuid4
 from chromadb.utils import embedding_functions
 from langchain_groq import ChatGroq
@@ -9,7 +8,7 @@ from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
 
-# ✅ Securely Fetch API Key
+# ✅ Securely Fetch API Key from Streamlit Secrets
 api_key = st.secrets["GROQ_MODEL"]
 
 # ✅ Constants
@@ -17,12 +16,11 @@ CHUNK_SIZE = 512
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 COLLECTION_NAME = "news_articles"
 
-# ✅ Disable Tokenizer Parallelism Warning
+# ✅ Disable Hugging Face tokenizer parallelism warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# ✅ Use ChromaDB with a Temporary Directory (Fix for Streamlit Cloud)
-with tempfile.TemporaryDirectory() as chroma_temp_dir:
-    chroma_client = chromadb.PersistentClient(path=chroma_temp_dir)  # ✅ Uses a temporary path
+# ✅ Use EphemeralClient (Avoids SQLite Issues)
+chroma_client = chromadb.EphemeralClient()  # ✅ This keeps everything in memory (NO SQLite dependency issues)
 
 # ✅ Initialize Components
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=api_key, temperature=0.7, max_tokens=500)
