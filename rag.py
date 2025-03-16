@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import chromadb
+import tempfile  # ✅ Fix for Streamlit Cloud
 from uuid import uuid4
 from chromadb.utils import embedding_functions
 from langchain_groq import ChatGroq
@@ -19,8 +20,9 @@ COLLECTION_NAME = "news_articles"
 # ✅ Disable Tokenizer Parallelism Warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# ✅ Use In-Memory ChromaDB (Fixes SQLite Issues)
-chroma_client = chromadb.EphemeralClient()  # ✅ Runs in-memory, avoids SQLite errors
+# ✅ Use ChromaDB with a Temporary Directory (Fix for Streamlit Cloud)
+with tempfile.TemporaryDirectory() as chroma_temp_dir:
+    chroma_client = chromadb.PersistentClient(path=chroma_temp_dir)  # ✅ Uses a temporary path
 
 # ✅ Initialize Components
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=api_key, temperature=0.7, max_tokens=500)
