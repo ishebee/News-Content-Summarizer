@@ -8,19 +8,19 @@ from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
 
-# ✅ Fetch API Key Securely from Streamlit Secrets
+# ✅ Securely Fetch API Key
 api_key = st.secrets["GROQ_MODEL"]
 
 # ✅ Constants
 CHUNK_SIZE = 512
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-COLLECTION_NAME = "real_estate"
+COLLECTION_NAME = "news_articles"
 
-# ✅ Disable Hugging Face tokenizer parallelism warning
+# ✅ Disable Tokenizer Parallelism Warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# ✅ Use In-Memory ChromaDB (Fix for Streamlit Cloud)
-chroma_client = chromadb.EphemeralClient()  # ✅ Runs in memory, avoids file storage issues
+# ✅ Use In-Memory ChromaDB (Fixes SQLite Issues)
+chroma_client = chromadb.EphemeralClient()  # ✅ Runs in-memory, avoids SQLite errors
 
 # ✅ Initialize Components
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=api_key, temperature=0.7, max_tokens=500)
@@ -30,19 +30,19 @@ collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME, embedd
 
 def process_urls(urls):
     """Scrapes data from URLs and stores it in ChromaDB."""
-    yield "Initializing Components..."
+    yield "🔄 Initializing Components..."
 
     loader = UnstructuredURLLoader(urls=urls)
     data = loader.load()
-    yield f"Extracted {len(data)} documents from URLs."
+    yield f"📄 Extracted {len(data)} documents from URLs."
 
     if not data or all(not doc.page_content.strip() for doc in data):
-        yield "❌ ERROR: No content extracted!"
+        yield "❌ ERROR: No content was extracted!"
         return
 
     text_splitter = RecursiveCharacterTextSplitter(separators=["\n\n", "\n", ".", " "], chunk_size=CHUNK_SIZE)
     docs = text_splitter.split_documents(data)
-    yield f"Total documents after splitting: {len(docs)}"
+    yield f"📑 Total documents after splitting: {len(docs)}"
 
     if len(docs) == 0:
         yield "❌ ERROR: No documents were split properly."
@@ -50,7 +50,7 @@ def process_urls(urls):
 
     texts = [doc.page_content for doc in docs]
     ids = [str(uuid4()) for _ in range(len(docs))]
-    metadatas = [{"source": urls[i % len(urls)]} for i in range(len(docs))]
+    metadatas = [{"source": urls[i % len(urls)]} for i in range(len(docs))]  # Store actual URLs
 
     # ✅ Store Data in ChromaDB
     collection.add(ids=ids, documents=texts, metadatas=metadatas)
@@ -62,7 +62,7 @@ def generate_answer(query):
     retrieved_docs = collection.query(query_texts=[query], n_results=5)
 
     if not retrieved_docs["documents"]:
-        return "I couldn't find relevant information.", []
+        return "⚠️ I couldn't find relevant information.", []
 
     docs_text = retrieved_docs["documents"][0]
     sources = [meta["source"] for meta in retrieved_docs["metadatas"][0]]
