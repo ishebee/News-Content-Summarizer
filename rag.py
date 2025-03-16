@@ -1,6 +1,5 @@
-import os
+import streamlit as st
 from uuid import uuid4
-from dotenv import load_dotenv
 from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
@@ -9,8 +8,8 @@ from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
 
-# Load environment variables
-load_dotenv()
+# ✅ Fetch API key from Streamlit Secrets
+api_key = st.secrets["GROQ_MODEL"]
 
 # Constants
 CHUNK_SIZE = 512
@@ -19,6 +18,7 @@ VECTORSTORE_DIR = Path(__file__).parent / "resources/vectorstore"
 COLLECTION_NAME = "real_estate"
 
 # Disable Hugging Face tokenizer parallelism warning
+import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Initialize components
@@ -33,18 +33,18 @@ def initialize_components():
     global llm, chroma_client, collection
 
     if llm is None:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500)
+        llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=api_key, temperature=0.7, max_tokens=500)
 
     if chroma_client is None:
         chroma_client = chromadb.PersistentClient(path=str(VECTORSTORE_DIR))
 
-    #  Use sentence-transformers for embeddings
+    # ✅ Use sentence-transformers for embeddings
     embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
 
     collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME, embedding_function=embedding_func)
 
-    #  Remove Old Data Before Adding New URLs (Fix applied)
-    collection.delete(where={"source": {"$ne": ""}})  #  Deletes all docs where 'source' is not empty
+    # ✅ Remove Old Data Before Adding New URLs
+    collection.delete(where={"source": {"$ne": ""}})  # Deletes all docs where 'source' is not empty
 
     print(" ChromaDB cleared. Ready for new data.")
 
@@ -73,8 +73,8 @@ def process_urls(urls):
     texts = [doc.page_content for doc in docs]
     ids = [str(uuid4()) for _ in range(len(docs))]
 
-    #  FIXED: Store actual URLs in metadata instead of "Doc X"
-    metadatas = [{"source": urls[i % len(urls)]} for i in range(len(docs))]  #  Stores the Correct URL
+    # ✅ Store actual URLs in metadata instead of "Doc X"
+    metadatas = [{"source": urls[i % len(urls)]} for i in range(len(docs))]  # Stores the correct URL
 
     collection.add(ids=ids, documents=texts, metadatas=metadatas)
     yield f" ChromaDB now contains {collection.count()} documents."
@@ -87,7 +87,7 @@ def generate_answer(query):
     if collection is None:
         initialize_components()
 
-    #  Retrieve relevant documents
+    # Retrieve relevant documents
     retrieved_docs = collection.query(query_texts=[query], n_results=5)
 
     print("\n Retrieved Documents (Before LLM Query):")
@@ -96,7 +96,7 @@ def generate_answer(query):
         return "I couldn't find relevant information.", []
 
     docs_text = retrieved_docs["documents"][0]  # Extract retrieved text
-    sources = [meta["source"] for meta in retrieved_docs["metadatas"][0]]  #  Extract exact URLs
+    sources = [meta["source"] for meta in retrieved_docs["metadatas"][0]]  # Extract exact URLs
 
     # Format the context for LLM
     context = "\n\n".join(docs_text)
@@ -105,39 +105,12 @@ def generate_answer(query):
     # Call LLM
     result = llm.invoke(prompt)
 
-    # Fix: Extract only the answer text
+    # ✅ Fix: Extract only the answer text
     if isinstance(result, dict) and "content" in result:
-        answer = result["content"]  #  Extract only the content
-    elif hasattr(result, "content"):  # Handle object-based response
+        answer = result["content"]
+    elif hasattr(result, "content"):
         answer = result.content
     else:
-        answer = str(result)  # Fallback to string conversion
+        answer = str(result)
 
     return answer, set(sources)
-
-
-"""
-if __name__ == "__main__":
-    urls = [
-        "https://www.cnbc.com/2024/12/21/how-the-federal-reserves-rate-policy-affects-mortgages.html",
-        "https://indianexpress.com/article/explained/explained-economics/indians-over-taxed-union-budget-9807329/"
-    ]
-
-    # Process URLs and store them in ChromaDB
-    process_urls(urls)
-
-    # Fetch all stored documents to confirm storage
-    print("\n Fetching all stored documents in ChromaDB...")
-    existing_docs = collection.count()
-    if existing_docs > 0:
-        print(f" ChromaDB contains {existing_docs} documents.")
-    else:
-        print(" ERROR: No documents were stored in ChromaDB.")
-
-    # Run final query
-    question = "Tell me what percentage India grew in 2019-2020"
-    answer, sources = generate_answer(question)
-
-    print(f"\n Answer: {answer}")
-    print(f" Sources: {', '.join(set(sources))}")  # Show real URLs, not "Doc 1"
-"""
