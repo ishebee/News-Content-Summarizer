@@ -1,0 +1,9 @@
+python-dotenv
+streamlit
+unstructured
+uuid
+pathlib
+chromadb
+langchain_groq
+langchain_community
+langchain
