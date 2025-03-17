@@ -16,7 +16,7 @@ load_dotenv()  # Works locally but won't work in Streamlit Cloud
 # Constants
 CHUNK_SIZE = 512
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-VECTORSTORE_DIR = Path(__file__).parent / "resources/vectorstore"
+VECTORSTORE_DIR = Path.home() / "chroma_db"
 COLLECTION_NAME = "real_estate"
 
 # Ensure Streamlit Cloud compatibility
@@ -26,7 +26,7 @@ PERSISTENT_STORAGE = os.getenv("STREAMLIT_CLOUD") != "true"  # Disable persisten
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Load API Key from Streamlit Secrets (for Streamlit Cloud)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets["GROQ_API_KEY"]
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Initialize components
 llm = None
@@ -43,10 +43,7 @@ def initialize_components():
         llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500, api_key=GROQ_API_KEY)
 
     if chroma_client is None:
-        if PERSISTENT_STORAGE:
-            chroma_client = chromadb.PersistentClient(path=str(VECTORSTORE_DIR))
-        else:
-            chroma_client = chromadb.Client()  # In-memory mode for Streamlit Cloud
+        chroma_client = chromadb.PersistentClient(path=str(VECTORSTORE_DIR))
 
     embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
     collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME, embedding_function=embedding_func)
