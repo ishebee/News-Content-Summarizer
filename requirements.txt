@@ -9,7 +9,4 @@ langchain_community
 langchain
 transformers
 sentence-transformers
-torch 
-torchvision 
-torchaudio
 tensorflow
