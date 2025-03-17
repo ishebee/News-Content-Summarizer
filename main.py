@@ -1,5 +1,4 @@
 import streamlit as st
-st.set_option("server.runOnSave", False)
 from rag import process_urls, generate_answer
 import os
 port = int(os.environ.get("PORT", 10000))
