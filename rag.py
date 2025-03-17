@@ -1,4 +1,5 @@
 import os
+os.environ["SENTENCE_TRANSFORMERS_HOME"] = "tensorflow"
 from uuid import uuid4
 from dotenv import load_dotenv
 from pathlib import Path
