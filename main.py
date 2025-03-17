@@ -1,7 +1,9 @@
 import streamlit as st
+st.set_option("server.runOnSave", False)
 from rag import process_urls, generate_answer
 import os
 port = int(os.environ.get("PORT", 10000))
+
 
 st.set_page_config(page_title="News Content Summarizer", layout="wide")
 
