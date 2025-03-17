@@ -9,5 +9,7 @@ langchain_community
 langchain
 transformers
 sentence-transformers
-torch torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
+torch 
+torchvision 
+torchaudio
 tensorflow
