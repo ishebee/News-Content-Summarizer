@@ -10,3 +10,4 @@ langchain
 transformers
 sentence-transformers
 tensorflow
+pysqlite3-binary
