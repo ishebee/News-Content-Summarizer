@@ -2,25 +2,28 @@ import asyncio
 import sys
 
 # Ensure there's an active event loop in Streamlit
-try:
-    asyncio.get_running_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
+if sys.platform != "win32":
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
 import os
 try:
     import pysqlite3
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")  # Force using updated SQLite
 except ImportError:
     print("pysqlite3-binary is missing. Install it using `pip install pysqlite3-binary`.")
+
 from uuid import uuid4
 from dotenv import load_dotenv
-from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
+import streamlit as st
 
 # Load environment variables
 load_dotenv()
@@ -33,8 +36,11 @@ COLLECTION_NAME = "real_estate"
 # Disable Hugging Face tokenizer parallelism warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Load API Key for Groq
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Load API Key for Groq (Works for both local & Streamlit Cloud)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    st.error("❌ GROQ_API_KEY is missing! Set it in `.env` (local) or `st.secrets` (Streamlit Cloud).")
 
 # Initialize components
 llm = None
@@ -44,22 +50,25 @@ tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL)
 
 
 def initialize_components():
-    """Initializes the LLM and ChromaDB vector database."""
+    """Initializes the LLM and ChromaDB in-memory database."""
     global llm, chroma_client, collection
 
-    # Initialize LLM if not already initialized
+    # Initialize LLM if not already done
     if llm is None:
         llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500, api_key=GROQ_API_KEY)
 
-    # Use an in-memory ChromaDB client (since no updates are needed)
-    if chroma_client is None:
-        chroma_client = chromadb.Client()
+    # Use an in-memory ChromaDB client (Streamlit Cloud does not support persistent storage)
+    chroma_client = chromadb.Client()
 
-    # Load the embedding function
+    # Load embedding function
     embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
 
-    # Create or get collection
-    collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME, embedding_function=embedding_func)
+    # Ensure the collection is created before querying
+    existing_collections = chroma_client.list_collections()
+    if COLLECTION_NAME not in [col.name for col in existing_collections]:
+        collection = chroma_client.create_collection(name=COLLECTION_NAME, embedding_function=embedding_func)
+    else:
+        collection = chroma_client.get_collection(name=COLLECTION_NAME)
 
 
 def process_urls(urls):
@@ -73,7 +82,7 @@ def process_urls(urls):
     yield f"Extracted {len(data)} documents from URLs."
 
     if not data or all(not doc.page_content.strip() for doc in data):
-        yield "ERROR: No content was extracted from the URLs!"
+        yield "⚠️ ERROR: No content was extracted from the URLs!"
         return
 
     # Split documents into smaller chunks
@@ -82,7 +91,7 @@ def process_urls(urls):
     yield f"Total documents after splitting: {len(docs)}"
 
     if len(docs) == 0:
-        yield "ERROR: No documents were split properly."
+        yield "⚠️ ERROR: No documents were split properly."
         return
 
     # Prepare documents for embedding
@@ -90,9 +99,12 @@ def process_urls(urls):
     ids = [str(uuid4()) for _ in range(len(docs))]
     metadatas = [{"source": urls[i % len(urls)]} for i in range(len(docs))]
 
-    # Store embeddings in ChromaDB
-    collection.add(ids=ids, documents=texts, metadatas=metadatas)
-    yield f"ChromaDB now contains {collection.count()} documents."
+    # Store embeddings in ChromaDB only if data exists
+    if len(texts) > 0:
+        collection.add(ids=ids, documents=texts, metadatas=metadatas)
+        yield f"✅ ChromaDB now contains {collection.count()} documents."
+    else:
+        yield "⚠️ No documents to add to ChromaDB."
 
 
 def generate_answer(query):
@@ -102,7 +114,10 @@ def generate_answer(query):
     if collection is None:
         initialize_components()
 
-    # Retrieve relevant documents
+    # Check if collection has data before querying
+    if collection.count() == 0:
+        return "⚠️ No data found in ChromaDB. Please process URLs first.", []
+
     retrieved_docs = collection.query(query_texts=[query], n_results=5)
 
     if not retrieved_docs["documents"]:
