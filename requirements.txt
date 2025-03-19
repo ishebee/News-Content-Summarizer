@@ -1,13 +1,14 @@
+tf-keras
+transformers
+chromadb
+pysqlite3-binary
 python-dotenv
 streamlit
 unstructured
 uuid
 pathlib
-chromadb
 langchain_groq
 langchain_community
 langchain
-transformers
 sentence-transformers
 tensorflow
-pysqlite3-binary
