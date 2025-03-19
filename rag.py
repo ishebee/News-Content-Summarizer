@@ -1,5 +1,12 @@
-import os
+import asyncio
 import sys
+
+# Ensure there's an active event loop in Streamlit
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+import os
 try:
     import pysqlite3
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")  # Force using updated SQLite
