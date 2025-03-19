@@ -24,6 +24,8 @@ from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
 import streamlit as st
+from chromadb.config import Settings
+
 
 # Load environment variables
 load_dotenv()
@@ -57,8 +59,14 @@ def initialize_components():
     if llm is None:
         llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500, api_key=GROQ_API_KEY)
 
-    # Use an in-memory ChromaDB client (Streamlit Cloud does not support persistent storage)
-    chroma_client = chromadb.Client()
+    # Explicitly define ChromaDB settings for Streamlit Cloud
+    settings = Settings(
+        anonymized_telemetry=False,  # Disables anonymous telemetry
+        allow_reset=True,            # Allows resetting collections
+    )
+
+    # Initialize ChromaDB client with settings
+    chroma_client = chromadb.Client(settings=settings)
 
     # Load embedding function
     embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
@@ -69,6 +77,7 @@ def initialize_components():
         collection = chroma_client.create_collection(name=COLLECTION_NAME, embedding_function=embedding_func)
     else:
         collection = chroma_client.get_collection(name=COLLECTION_NAME)
+
 
 
 def process_urls(urls):
