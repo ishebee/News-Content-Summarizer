@@ -52,21 +52,15 @@ tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL)
 
 
 def initialize_components():
-    """Initializes the LLM and ChromaDB in-memory database."""
+    """Initializes the LLM and ChromaDB with an HTTP-based client."""
     global llm, chroma_client, collection
 
     # Initialize LLM if not already done
     if llm is None:
         llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=500, api_key=GROQ_API_KEY)
 
-    # Explicitly define ChromaDB settings for Streamlit Cloud
-    settings = Settings(
-        anonymized_telemetry=False,  # Disables anonymous telemetry
-        allow_reset=True,            # Allows resetting collections
-    )
-
-    # Initialize ChromaDB client with settings
-    chroma_client = chromadb.Client(settings=settings)
+    # Use ChromaDB HTTP Client for Streamlit Cloud
+    chroma_client = chromadb.HttpClient(host="chroma-server", port=8000)
 
     # Load embedding function
     embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
